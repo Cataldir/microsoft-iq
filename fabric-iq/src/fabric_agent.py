@@ -2,6 +2,8 @@
 
 Uses the Fabric REST API to create a Fabric Agent item that connects to
 a Lakehouse and answers natural-language questions about the data.
+After queries, writes analytical results back to PostgreSQL to complete
+the Transactional → Analytical → Transactional data cycle.
 
 Usage:
     python src/fabric_agent.py --action create --workspace "my-workspace" --lakehouse "my-lakehouse" --name "my-agent"
@@ -11,15 +13,27 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import asyncio
 import json
+import os
 import sys
 import time
+from pathlib import Path
 
 import httpx
 from azure.identity import DefaultAzureCredential
 
+# Allow importing shared module
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "shared"))
+
+from dotenv import load_dotenv
+
+load_dotenv(Path(__file__).resolve().parents[2] / ".env")
+
 FABRIC_API = "https://api.fabric.microsoft.com/v1"
 FABRIC_SCOPE = "https://api.fabric.microsoft.com/.default"
+
+_PG_ENABLED = bool(os.environ.get("POSTGRES_HOST") or os.environ.get("POSTGRES_CONNECTION_STRING"))
 
 
 class FabricAgentManager:
@@ -78,10 +92,12 @@ class FabricAgentManager:
 
         if not instructions:
             instructions = (
-                "You are an analytics assistant. Answer questions about retail sales data "
-                "in the connected Lakehouse. Use the sales_transactions and products tables. "
+                "You are an e-commerce analytics assistant for Brazilian E-Commerce (Olist) data. "
+                "The Lakehouse contains: orders, order_items, order_payments, sales_summary, "
+                "delivery_performance, payment_analysis, top_products, top_sellers, and agent_insights. "
                 "Provide specific numbers, trends, and comparisons. Format responses with "
-                "bullet points and tables when presenting multiple data points."
+                "bullet points and tables. When analyzing delivery or payment data, include "
+                "percentage breakdowns and time-series trends."
             )
 
         body = {
@@ -234,6 +250,23 @@ def main():
             sys.exit(1)
         result = mgr.query_agent(ws["id"], agent["id"], args.question)
         print(json.dumps(result, indent=2, ensure_ascii=False))
+
+        # Write analytical result back to PostgreSQL (analytical → transactional)
+        if _PG_ENABLED and "error" not in result:
+            try:
+                from postgres_client import write_analytical_result, close_pool
+
+                summary = json.dumps(result)[:500] if isinstance(result, dict) else str(result)[:500]
+                row_id = asyncio.run(write_analytical_result(
+                    analysis_type="fabric_agent_query",
+                    result_summary=f"Q: {args.question[:200]} | A: {summary}",
+                    result_data={"question": args.question, "response": result},
+                    fabric_workspace=args.workspace,
+                ))
+                asyncio.run(close_pool())
+                print(f"\nAnalytical result #{row_id} written back to PostgreSQL")
+            except Exception as exc:
+                print(f"Note: Could not write to PostgreSQL: {exc}", file=sys.stderr)
 
     elif args.action == "list":
         with httpx.Client(timeout=30) as client:

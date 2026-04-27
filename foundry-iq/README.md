@@ -62,38 +62,55 @@ az deployment group create \
 ### Provision and Upload
 
 ```bash
-# Upload sample documents to Blob Storage
-python src/upload_documents.py
+# Download Kaggle dataset and upload to Blob Storage (run from repo root)
+python scripts/download_kaggle.py
+python scripts/upload_to_blob.py
 
-# Create and populate AI Search index
-python src/provision_datasources.py
+# Index products and reviews into AI Search
+python scripts/index_blob_data.py
+
+# (Legacy) Or use the original search indexer approach:
+# python src/provision_datasources.py
 ```
 
 ### Query the Agent
 
 ```bash
-# Query via CLI
-python src/query_agent.py "What products support real-time analytics?"
+# Query via CLI (writes insight to PostgreSQL if configured)
+python src/query_agent.py "What are the most common product categories?"
 
 # Or run the local web UI
-cd ui && python -m http.server 8080
-# Open http://localhost:8080
+python src/api_server.py
+# Open http://localhost:8000
 ```
 
 ## Architecture
 
 ```
-Azure Blob Storage          Azure AI Search
-  (documents)          →     (search index)
-                                    │
-                                    ▼
-                          Azure AI Foundry
-                          (knowledge base)
-                                    │
-                                    ▼
-                            Foundry Agent
-                          (grounded answers)
-                                    │
-                                    ▼
-                            Local Web UI
+Kaggle (Olist E-Commerce)
+    │
+    ├──► Blob Storage ──► AI Search Index
+    │    (CSVs)           (products + reviews)
+    │                           │
+    │                           ▼
+    │                     AI Foundry Agent
+    │                     (grounded answers)
+    │                           │
+    │                      ┌────┴────┐
+    │                      ▼         ▼
+    │                  Local UI   PostgreSQL
+    │                            (agent_insights)
+    │                                 │
+    └──► PostgreSQL ─────────────────►│
+         (orders, items, payments)    │
+                                      ▼
+                              Fabric Lakehouse (sync)
 ```
+
+### Transactional Bridge
+
+After each query, the agent writes a row to `agent_insights` in PostgreSQL:
+- `agent_name`, `question`, `answer`, `source_docs`, `metadata`
+- `synced_to_fabric` flag tracks which insights have been exported to Fabric
+
+Before answering, the agent checks PostgreSQL for unconsumed `analytical_results` from Fabric and incorporates them as additional context.

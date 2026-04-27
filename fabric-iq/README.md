@@ -1,24 +1,31 @@
 # Fabric IQ — Data Pipeline Agents
 
-This module demonstrates building an end-to-end data pipeline in Microsoft Fabric that ingests data, processes it through a Lakehouse, and creates a Fabric Agent that reasons over the ingested data — all via code-first approach using the Fabric REST API.
+This module demonstrates building an analytical pipeline in Microsoft Fabric that processes real e-commerce data (Olist / Kaggle) synced from PostgreSQL, creates derived analytical tables, and writes insights back to complete the **Transactional → Analytical → Transactional** data cycle.
 
 ## What You'll Learn
 
-1. **Fabric REST API**: Create workspaces, Lakehouses, and Eventstreams programmatically
-2. **Real-time ingestion**: Configure Eventstream to ingest sample data into a Lakehouse
-3. **Data processing**: Use a Fabric notebook to transform and analyze ingested data
-4. **Fabric Agent**: Create an agent that queries Lakehouse tables and answers natural-language questions
+1. **Fabric REST API**: Create workspaces, Lakehouses, and items programmatically
+2. **PostgreSQL → Lakehouse sync**: Export transactional data to Fabric via REST API
+3. **PySpark analytics**: Delivery performance, payment trends, revenue rankings
+4. **Fabric Agent**: Natural-language queries over Lakehouse data
+5. **Analytical writeback**: Fabric Agent results flow back to PostgreSQL for Foundry IQ
 
 ## Architecture
 
 ```
-Sample Data
+PostgreSQL (orders, items, payments, agent_insights)
     │
+    │  scripts/sync_to_fabric.py
     ▼
-Eventstream ──→ Lakehouse ──→ Fabric Agent
-                    │
-                    ▼
-              Notebook (ETL)
+Lakehouse (Delta Tables) ──→ Fabric Agent ──→ PostgreSQL
+    │                                         (analytical_results)
+    ▼
+Notebook (PySpark ETL)
+    ├── sales_summary
+    ├── delivery_performance
+    ├── payment_analysis
+    ├── top_products
+    └── top_sellers
 ```
 
 ### Components
@@ -26,15 +33,16 @@ Eventstream ──→ Lakehouse ──→ Fabric Agent
 | Component | Purpose |
 |-----------|---------|
 | Fabric Workspace | Container for all pipeline artifacts |
-| Eventstream | Real-time data ingestion from external sources |
 | Lakehouse | Unified analytics store (Delta Lake tables + files) |
-| Notebook | Data transformation and exploratory analysis |
+| Notebook | PySpark data transformation and derived table creation |
 | Fabric Agent | Natural-language reasoning over Lakehouse data |
+| PostgreSQL | Transactional store — source of orders, sink for analytical results |
 
 ## Prerequisites
 
 - Microsoft Fabric capacity (F2+ or trial)
 - Azure CLI authenticated (`az login`)
+- PostgreSQL with data loaded (see root README)
 - Python 3.11+ with `uv` or `pip`
 
 ## Quick Start
@@ -47,26 +55,14 @@ python src/fabric_client.py --action create-workspace --name "microsoft-iq-demo"
 python src/fabric_client.py --action create-lakehouse --workspace "microsoft-iq-demo" --name "iq-lakehouse"
 ```
 
-### Step 2 — Configure Eventstream
+### Step 2 — Sync PostgreSQL Data to Lakehouse
 
 ```bash
-python src/pipeline_orchestrator.py --action create-eventstream \
-    --workspace "microsoft-iq-demo" \
-    --name "iq-eventstream" \
-    --lakehouse "iq-lakehouse"
+# From repo root — exports orders, items, payments, and agent insights
+python scripts/sync_to_fabric.py --workspace microsoft-iq-demo --lakehouse iq-lakehouse
 ```
 
-### Step 3 — Ingest Sample Data
-
-```bash
-python src/pipeline_orchestrator.py --action ingest-sample \
-    --workspace "microsoft-iq-demo" \
-    --lakehouse "iq-lakehouse"
-```
-
-### Step 4 — Process Data with Notebook
-
-Upload and run the notebook in the Fabric workspace:
+### Step 3 — Upload and Run Notebook
 
 ```bash
 python src/fabric_client.py --action upload-notebook \
@@ -74,7 +70,7 @@ python src/fabric_client.py --action upload-notebook \
     --path notebooks/ingest_and_analyze.py
 ```
 
-### Step 5 — Create Fabric Agent
+### Step 4 — Create Fabric Agent
 
 ```bash
 python src/fabric_agent.py --action create \
@@ -83,23 +79,33 @@ python src/fabric_agent.py --action create \
     --name "iq-analyst"
 ```
 
-### Step 6 — Query the Agent
+### Step 5 — Query the Agent (writes back to Postgres)
 
 ```bash
 python src/fabric_agent.py --action query \
     --workspace "microsoft-iq-demo" \
     --name "iq-analyst" \
-    --question "What are the top 5 products by revenue this quarter?"
+    --question "What are the delivery performance trends by month?"
+# → Writes analytical_result to PostgreSQL, which Foundry Agent reads next time
 ```
 
-## Sample Data
+## Data Source
 
-The demo uses a synthetic retail dataset with:
-- **Products** — 50 items across 5 categories (electronics, clothing, food, sports, home)
-- **Sales transactions** — 1,000 records over 90 days with quantity, price, region
-- **Customer segments** — 4 tiers (bronze, silver, gold, platinum)
+Data comes from the **Olist Brazilian E-Commerce** Kaggle dataset, loaded into PostgreSQL via `shared/postgres_client.py --action load-kaggle` and synced to Fabric via `scripts/sync_to_fabric.py`.
 
-No real business data is included.
+### Lakehouse Tables
+
+| Table | Source | Description |
+|-------|--------|-------------|
+| `orders` | Postgres sync | 99K+ order records with status and timestamps |
+| `order_items` | Postgres sync | Line items with product, seller, price, freight |
+| `order_payments` | Postgres sync | Payment records with type and installments |
+| `agent_insights` | Postgres sync | Foundry agent Q&A interactions |
+| `sales_summary` | Derived (notebook) | Daily/monthly revenue by status |
+| `delivery_performance` | Derived (notebook) | Monthly delivery SLA and timing |
+| `payment_analysis` | Derived (notebook) | Payment method distribution |
+| `top_products` | Derived (notebook) | Products ranked by revenue |
+| `top_sellers` | Derived (notebook) | Sellers ranked by revenue |
 
 ## Code-First Philosophy
 
@@ -115,7 +121,7 @@ Every resource is created via the Fabric REST API rather than through the portal
 |----------|---------|
 | `POST /v1/workspaces` | Create workspace |
 | `POST /v1/workspaces/{id}/lakehouses` | Create Lakehouse |
-| `POST /v1/workspaces/{id}/eventstreams` | Create Eventstream |
 | `POST /v1/workspaces/{id}/notebooks` | Upload notebook |
 | `POST /v1/workspaces/{id}/items` | Create Fabric Agent |
 | `GET /v1/workspaces/{id}/lakehouses/{id}/tables` | List Lakehouse tables |
+| `POST .../tables/{name}/load` | Load CSV data into table |
