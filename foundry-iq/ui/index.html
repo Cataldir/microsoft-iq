@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Foundry IQ — Knowledge Base Agent</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="app">
+        <header class="header">
+            <div class="logo">
+                <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
+                    <circle cx="16" cy="16" r="14" fill="#61AEBE" stroke="#617595" stroke-width="2"/>
+                    <path d="M10 16c0-3.3 2.7-6 6-6s6 2.7 6 6-2.7 6-6 6" stroke="#fff" stroke-width="2" fill="none"/>
+                    <circle cx="16" cy="10" r="2" fill="#50C19B"/>
+                    <circle cx="22" cy="16" r="2" fill="#50C19B"/>
+                    <circle cx="16" cy="22" r="2" fill="#50C19B"/>
+                    <circle cx="10" cy="16" r="2" fill="#50C19B"/>
+                </svg>
+                <h1>Foundry IQ</h1>
+            </div>
+            <p class="subtitle">Query your knowledge base agent</p>
+        </header>
+
+        <main class="chat-container">
+            <div id="messages" class="messages">
+                <div class="message assistant">
+                    <div class="message-content">
+                        Welcome! I'm your Foundry IQ agent, grounded with product knowledge from Azure AI Search and Blob Storage. Ask me about Microsoft products and services.
+                    </div>
+                </div>
+            </div>
+
+            <form id="chat-form" class="input-area">
+                <input
+                    type="text"
+                    id="user-input"
+                    placeholder="Ask about products, services, or capabilities..."
+                    autocomplete="off"
+                    required
+                />
+                <button type="submit" id="send-btn">
+                    <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                        <path d="M3 10l7-7 7 7M10 3v14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                    </svg>
+                </button>
+            </form>
+        </main>
+
+        <footer class="footer">
+            <div class="config-panel">
+                <label>
+                    API Endpoint:
+                    <input type="text" id="api-endpoint" placeholder="http://localhost:8000" value="http://localhost:8000" />
+                </label>
+                <span class="status" id="status">Local mode</span>
+            </div>
+        </footer>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
