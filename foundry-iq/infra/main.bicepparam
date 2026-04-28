@@ -1,6 +1,7 @@
 using 'main.bicep'
 
-param location = 'eastus2'
+param location = 'centralus'
 param searchSku = 'basic'
-param containerName = 'knowledge-docs'
-param searchIndexName = 'microsoft-iq-products'
+param containerName = 'kaggle-data'
+param searchIndexName = 'ecommerce-knowledge'
+// deployerPrincipalId is passed via CLI: --parameters deployerPrincipalId=<object-id>

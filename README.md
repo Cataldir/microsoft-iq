@@ -16,7 +16,7 @@ Data flows from Kaggle through three stages — **Transactional → Analytical �
 
 ```
                     ┌──────────────────────────────────────────────┐
-                    │          END-TO-END DATA CYCLE                │
+                    │          END-TO-END DATA CYCLE               │
                     │                                              │
    Kaggle           │   TRANSACTIONAL        ANALYTICAL            │
    (Olist)          │                                              │
@@ -31,7 +31,7 @@ Data flows from Kaggle through three stages — **Transactional → Analytical �
      │              │   └────┬─────┘        └────┬─────┘           │
      │              │        │                   │                 │
      │              │        ▼                   ▼                 │
-     └──► Postgres ◄┼── insights ──►    ◄── results ──►           │
+     └──► Postgres ◄┼── insights ──►    ◄── results ──►            │
           (orders,  │  (agent writes)     (agent writes)           │
            items,   │        │                   │                 │
            payments)│        └───► sync ◄────────┘                 │

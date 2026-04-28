@@ -29,6 +29,10 @@ def upload_csvs(source_dir: str, container_name: str) -> dict[str, int]:
     blob_service = BlobServiceClient(
         account_url=f"https://{account_name}.blob.core.windows.net",
         credential=credential,
+        max_single_put_size=4 * 1024 * 1024,
+        max_block_size=4 * 1024 * 1024,
+        connection_timeout=300,
+        read_timeout=300,
     )
 
     container_client = blob_service.get_container_client(container_name)
